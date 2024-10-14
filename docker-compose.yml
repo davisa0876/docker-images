@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+
+  pgadmin:
+      image: adminer
+      restart: always
+      links:
+        - database
+        - mysqldb
+      ports:
+        - 9090:9090
+      networks:
+        - laravel-network
+
+  mysql:
+    image: mysql:latest
+    container_name: mysql-container
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: laravelTest
+      MYSQL_DATABASE: contenthubDB
+      MYSQL_USER: contentUser
+      MYSQL_PASSWORD: contentPass
+    ports:
+      - "8080:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - laravel-network
+
+  minio:
+      image: minio/minio
+      container_name: minio
+      volumes:
+        - minio_data:/data
+      ports:
+        - "9000:9000"
+      environment:
+        MINIO_ROOT_USER: minioadmin
+        MINIO_ROOT_PASSWORD: minioadmin
+        MINIO_API_CORS_ALLOW_ORIGIN: '*'
+      command: server /data
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://minio:9000/minio/health/live"]
+        interval: 30s
+        timeout: 20s
+        retries: 3
+      networks:
+        - laravel-network
+
+
+  mc:
+    image: minio/mc
+    depends_on:
+      - minio
+    networks:
+      - laravel-network
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      mc alias set mylocal http://localhost:9000 minioadmin minioadmin;
+      sleep 10;
+      mc anonymous set public mylocal/my-bucket;
+      sleep infinity;
+      "
+
+volumes:
+  mysql_data:
+  minio_data:
+
+networks:
+  laravel-network:
+    external: true
+
